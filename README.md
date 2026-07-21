@@ -1,0 +1,99 @@
+# ai-kit-filament
+
+**The Filament admin panel for [ai-kit](https://github.com/solutionforest/ai-kit)** — manage knowledge bases and documents, ingest files and URLs, review conversations with token usage, demo the chat in a Playground, and watch usage on an analytics dashboard.
+
+<p align="center">
+  <img src="art/dashboard.png" alt="AI Kit dashboard: stats + token usage chart" width="820">
+</p>
+
+## Requirements
+
+- PHP **8.3+**, Laravel **12 or 13**
+- **Filament v5** (Livewire 4)
+- `solutionforest/ai-kit-core` and `solutionforest/ai-kit-ui`
+
+## Install
+
+```bash
+composer require solutionforest/ai-kit-filament
+```
+
+Register the plugin on your panel:
+
+```php
+use SolutionForest\AiKit\Filament\AiKitPlugin;
+
+public function panel(Panel $panel): Panel
+{
+    return $panel
+        // ...
+        ->plugin(AiKitPlugin::make());
+}
+```
+
+Everything appears under an **AI Kit** navigation group.
+
+## What you get
+
+### Collections + Documents (inline)
+
+A **Collections** resource. Open a collection to manage its **Documents** inline (relation manager):
+
+- **Upload** — pdf, txt, md, html, **Word (.docx)**, **Excel (.xlsx)**
+- **Add from URL** — fetch + ingest a web page
+- **View chunks** — inspect the embedded passages of any document
+- **Re-index** / **Delete**
+- status badge (pending / processing / indexed / failed) + chunk count
+
+<p align="center">
+  <img src="art/collection-documents.png" alt="Collection edit page with inline documents relation manager" width="820">
+</p>
+
+### Conversations (read-only) with token usage
+
+A log viewer of every conversation. The list shows **total tokens (in / out)** per conversation; open one to see the message thread with **per-message input/output tokens**.
+
+<p align="center">
+  <img src="art/conversation.png" alt="Conversation detail with per-message token usage" width="820">
+</p>
+
+### Playground
+
+A demo page: pick a knowledge base and chat live against it — the same Livewire component your app embeds. Ideal for client demos.
+
+<p align="center">
+  <img src="art/playground.png" alt="Playground page with collection selector and chat" width="820">
+</p>
+
+### Analytics dashboard
+
+A dedicated **Dashboard** page (under AI Kit, not the panel's default dashboard): documents indexed, chunks, conversations this week, **tokens (30d)**, **estimated cost (30d)**, and a **prompt vs. completion tokens-per-day** chart.
+
+## Optional features
+
+Toggle in `config/ai-kit.php` (or `.env`):
+
+```php
+'features' => [
+    'dashboard'   => env('AI_KIT_DASHBOARD', true),    // register the Dashboard page
+    'token_usage' => env('AI_KIT_TOKEN_USAGE', true),  // token columns, per-message tokens, dashboard token stats + chart + cost
+],
+```
+
+- `dashboard=false` → the Dashboard page + route are not registered.
+- `token_usage=false` → all token/cost UI is hidden (conversation column, per-message tokens, dashboard token stats and chart).
+
+### Cost estimates
+
+Cost = logged tokens × `config('ai-kit.pricing')` ($ per 1M input / output, per model), based on the active chat model. Add a rate entry for the model you use:
+
+```php
+'pricing' => [
+    'google/gemini-2.5-flash' => ['input' => 0.30, 'output' => 2.50],
+    // unlisted models → 'default' (0)
+],
+```
+
+## License
+
+MIT © [SolutionForest](https://www.solutionforest.com)
