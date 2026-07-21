@@ -6,6 +6,14 @@
   <img src="art/dashboard.png" alt="AI Kit dashboard: stats + token usage chart" width="820">
 </p>
 
+## Why this package?
+
+Give your team (or clients) a no-code way to run the whole RAG pipeline: create
+knowledge bases, upload PDFs/Word/Excel or add URLs, watch documents get indexed,
+inspect the actual chunks, replay conversations with token usage, demo the chat
+live, and track cost — all inside your existing Filament panel. One `->plugin()`
+call, no controllers or Blade to write.
+
 ## Requirements
 
 - PHP **8.3+**, Laravel **12 or 13**
@@ -93,6 +101,18 @@ Cost = logged tokens × `config('ai-kit.pricing')` ($ per 1M input / output, per
     // unlisted models → 'default' (0)
 ],
 ```
+
+## The ai-kit suite
+
+| Package | Purpose |
+| --- | --- |
+| [solutionforest/ai-kit-core](https://github.com/solutionforest/ai-kit-core) | Ingestion, retrieval, agents + CLI, HTTP API, MCP |
+| [solutionforest/ai-kit-ui](https://github.com/solutionforest/ai-kit-ui) | Livewire 4 chat component |
+| **solutionforest/ai-kit-filament** (this) | Filament v5 admin panel |
+
+The panel is one of **four faces** over the same core — everything here is also
+scriptable via the CLI, callable over the HTTP API, or exposed to AI agents via
+MCP (all in `ai-kit-core`).
 
 ## License
 
