@@ -55,8 +55,10 @@ final class DocumentsRelationManager extends RelationManager
                             ->directory('ai-kit/uploads')
                             ->preserveFilenames()
                             ->acceptedFileTypes(DocumentResource::ACCEPTED_MIMES)
-                            ->required()
-                            ->dehydrated(false),
+                            ->required(),
+                        // Keep source_upload dehydrated so mutateDataUsing() /
+                        // prepareUpload() can read it; prepareUpload unsets it
+                        // before the record is created.
                     ])
                     ->mutateDataUsing(fn (array $data): array => DocumentResource::prepareUpload($data))
                     ->after(fn (Document $record) => app(IngestionService::class)->queue($record))

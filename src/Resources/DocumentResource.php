@@ -66,7 +66,10 @@ final class DocumentResource extends Resource
                 ->preserveFilenames()
                 ->acceptedFileTypes(self::ACCEPTED_MIMES)
                 ->required()
-                ->dehydrated(false)
+                // Keep dehydrated: prepareUpload() reads source_upload from the
+                // form data (and unset()s it before the model is saved). Marking
+                // it dehydrated(false) stripped it before prepareUpload ran, so
+                // source_path stayed null and ingestion had no file to read.
                 ->visibleOn('create'),
         ]);
     }

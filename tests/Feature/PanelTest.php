@@ -82,6 +82,31 @@ it('maps an uploaded file into ingestible document attributes', function (): voi
         ->and($data['mime'])->toContain('text/');
 });
 
+it('keeps the upload field in the form data so prepareUpload can set source_path', function (): void {
+    // Regression: the FileUpload was ->dehydrated(false), which stripped
+    // source_upload from the form data BEFORE prepareUpload() read it — so
+    // every document created through the panel got a null source_path and
+    // ingestion failed with "no source file to extract". The field must stay
+    // dehydrated (prepareUpload unsets it before the model is saved).
+    $find = function ($schema): ?\Filament\Forms\Components\FileUpload {
+        foreach ($schema->getComponents(withHidden: true) as $component) {
+            if ($component instanceof \Filament\Forms\Components\FileUpload
+                && $component->getName() === 'source_upload') {
+                return $component;
+            }
+        }
+
+        return null;
+    };
+
+    $page = new \SolutionForest\AiKit\Filament\Resources\DocumentResource\Pages\CreateDocument();
+    $schema = \Filament\Schemas\Schema::make($page)->operation('create');
+    $upload = $find(DocumentResource::form($schema));
+
+    expect($upload)->not->toBeNull()
+        ->and($upload->isDehydrated())->toBeTrue();
+});
+
 it('preselects the first collection when the playground mounts', function (): void {
     Collection::create(['name' => 'Beta', 'slug' => 'beta']);
     Collection::create(['name' => 'Alpha', 'slug' => 'alpha']);
