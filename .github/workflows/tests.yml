@@ -1,0 +1,45 @@
+# Runs the test suite when a new version is released (not on every push).
+#
+# This package has local path dependencies on ai-kit-core (../core) and
+# ai-kit-ui-livewire (../ui), so CI clones them as siblings first. Add a repo secret
+# `GH_PAT` (a PAT with `repo` scope) so the private siblings can be cloned.
+# Once the packages are on Packagist, drop the clone steps.
+name: tests
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pest:
+    name: PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.3', '8.4']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone sibling packages (path dependencies)
+        run: |
+          git clone --depth=1 "https://x-access-token:${{ secrets.GH_PAT }}@github.com/solutionforest/ai-kit-core.git" ../core
+          git clone --depth=1 "https://x-access-token:${{ secrets.GH_PAT }}@github.com/solutionforest/ai-kit-ui-livewire.git" ../ui
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: zip, sqlite3, pdo_sqlite
+          coverage: none
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-interaction --no-progress
+
+      - name: Run tests
+        run: vendor/bin/pest

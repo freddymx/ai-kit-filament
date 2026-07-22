@@ -1,6 +1,11 @@
 # ai-kit-filament
 
-**The Filament admin panel for [ai-kit](https://github.com/solutionforest/ai-kit)** — manage knowledge bases and documents, ingest files and URLs, review conversations with token usage, demo the chat in a Playground, and watch usage on an analytics dashboard.
+![PHP](https://img.shields.io/badge/PHP-8.3+-777BB4?logo=php&logoColor=white)
+![Laravel](https://img.shields.io/badge/Laravel-12%20|%2013-FF2D20?logo=laravel&logoColor=white)
+![Filament](https://img.shields.io/badge/Filament-v5-FDAE4B?logo=laravel&logoColor=white)
+![License](https://img.shields.io/badge/license-MIT-green)
+
+**The Filament admin panel for the ai-kit suite** — manage knowledge bases and documents, ingest files and URLs, review conversations with token usage, demo the chat in a Playground, and watch usage on an analytics dashboard.
 
 <p align="center">
   <img src="art/dashboard.png" alt="AI Kit dashboard: stats + token usage chart" width="820">
@@ -18,7 +23,7 @@ call, no controllers or Blade to write.
 
 - PHP **8.3+**, Laravel **12 or 13**
 - **Filament v5** (Livewire 4)
-- `solutionforest/ai-kit-core` and `solutionforest/ai-kit-ui`
+- `solutionforest/ai-kit-core` and `solutionforest/ai-kit-ui-livewire`
 
 ## Install
 
@@ -107,7 +112,7 @@ Cost = logged tokens × `config('ai-kit.pricing')` ($ per 1M input / output, per
 | Package | Purpose |
 | --- | --- |
 | [solutionforest/ai-kit-core](https://github.com/solutionforest/ai-kit-core) | Ingestion, retrieval, agents + CLI, HTTP API, MCP |
-| [solutionforest/ai-kit-ui](https://github.com/solutionforest/ai-kit-ui) | Livewire 4 chat component |
+| [solutionforest/ai-kit-ui-livewire](https://github.com/solutionforest/ai-kit-ui-livewire) | Livewire 4 chat component |
 | **solutionforest/ai-kit-filament** (this) | Filament v5 admin panel |
 
 The panel is one of **four faces** over the same core — everything here is also
