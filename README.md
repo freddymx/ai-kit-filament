@@ -23,12 +23,12 @@ call, no controllers or Blade to write.
 
 - PHP **8.3+**, Laravel **12 or 13**
 - **Filament v5** (Livewire 4)
-- `solutionforest/ai-kit-core` and `solutionforest/ai-kit-ui-livewire`
+- `solution-forest/ai-kit-core` and `solution-forest/ai-kit-ui-livewire`
 
 ## Install
 
 ```bash
-composer require solutionforest/ai-kit-filament
+composer require solution-forest/ai-kit-filament
 ```
 
 Register the plugin on your panel:
@@ -111,9 +111,9 @@ Cost = logged tokens × `config('ai-kit.pricing')` ($ per 1M input / output, per
 
 | Package | Purpose |
 | --- | --- |
-| [solutionforest/ai-kit-core](https://github.com/solutionforest/ai-kit-core) | Ingestion, retrieval, agents + CLI, HTTP API, MCP |
-| [solutionforest/ai-kit-ui-livewire](https://github.com/solutionforest/ai-kit-ui-livewire) | Livewire 4 chat component |
-| **solutionforest/ai-kit-filament** (this) | Filament v5 admin panel |
+| [solution-forest/ai-kit-core](https://github.com/solutionforest/ai-kit-core) | Ingestion, retrieval, agents + CLI, HTTP API, MCP |
+| [solution-forest/ai-kit-ui-livewire](https://github.com/solutionforest/ai-kit-ui-livewire) | Livewire 4 chat component |
+| **solution-forest/ai-kit-filament** (this) | Filament v5 admin panel |
 
 The panel is one of **four faces** over the same core — everything here is also
 scriptable via the CLI, callable over the HTTP API, or exposed to AI agents via
