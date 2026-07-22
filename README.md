@@ -123,10 +123,8 @@ MCP (all in `ai-kit-core`).
 
 `.github/workflows/tests.yml` runs the suite on a GitHub **release** (and manual
 dispatch) — not on every push. This package has local path dependencies on
-`ai-kit-core` and `ai-kit-ui-livewire`, so CI clones both sibling repos first —
-add a repository secret **`GH_PAT`** (a PAT with `repo` scope) under *Settings →
-Secrets and variables → Actions*. Without it the release workflow fails at the
-clone step. Once the packages are on Packagist, drop the clone steps.
+`ai-kit-core` and `ai-kit-ui-livewire`, so CI clones both (public) sibling repos
+first. Once the packages are on Packagist, drop the clone steps.
 
 ## License
 
