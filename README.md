@@ -1,6 +1,6 @@
 # ai-kit-filament
 
-![PHP](https://img.shields.io/badge/PHP-8.3+-777BB4?logo=php&logoColor=white)
+![PHP](https://img.shields.io/badge/PHP-8.5+-777BB4?logo=php&logoColor=white)
 ![Laravel](https://img.shields.io/badge/Laravel-12%20|%2013-FF2D20?logo=laravel&logoColor=white)
 ![Filament](https://img.shields.io/badge/Filament-v5-FDAE4B?logo=laravel&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -21,7 +21,7 @@ call, no controllers or Blade to write.
 
 ## Requirements
 
-- PHP **8.3+**, Laravel **12 or 13**
+- PHP **8.5+**, Laravel **12 or 13**
 - **Filament v5** (Livewire 4)
 - `solution-forest/ai-kit-core` and `solution-forest/ai-kit-ui-livewire`
 

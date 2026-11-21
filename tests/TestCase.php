@@ -70,7 +70,7 @@ abstract class TestCase extends Orchestra
 
     protected function defineDatabaseMigrations(): void
     {
-        $this->loadMigrationsFrom(__DIR__ . '/../../core/database/migrations');
+        $this->loadMigrationsFrom(__DIR__ . '/../../ai-kit-core/database/migrations');
         $this->loadMigrationsFrom(__DIR__ . '/../vendor/laravel/ai/database/migrations');
     }
 }

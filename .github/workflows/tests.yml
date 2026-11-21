@@ -1,7 +1,7 @@
 # Runs the test suite when a new version is released (not on every push).
 #
-# This package has local path dependencies on ai-kit-core (../core) and
-# ai-kit-ui-livewire (../ui), so CI clones both sibling repos first. Once the
+# This package has local path dependencies on ai-kit-core (../ai-kit-core) and
+# ai-kit-ui-livewire (../ai-kit-ui-livewire), so CI clones both sibling repos first. Once the
 # packages are on Packagist, drop the clone steps and let Composer resolve them.
 name: tests
 
@@ -20,15 +20,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        php: ['8.3', '8.4']
+        php: ['8.5']
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Clone sibling packages (path dependencies)
         run: |
-          git clone --depth=1 https://github.com/solutionforest/ai-kit-core.git ../core
-          git clone --depth=1 https://github.com/solutionforest/ai-kit-ui-livewire.git ../ui
+          git clone --depth=1 https://github.com/solutionforest/ai-kit-core.git ../ai-kit-core
+          git clone --depth=1 https://github.com/solutionforest/ai-kit-ui-livewire.git ../ai-kit-ui-livewire
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2

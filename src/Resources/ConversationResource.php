@@ -54,7 +54,12 @@ final class ConversationResource extends Resource
                         return number_format($t['total']) . '  (' . number_format($t['prompt'])
                             . ' / ' . number_format($t['completion']) . ')';
                     }),
-                TextColumn::make('user_id')->label('User')->toggleable(),
+                TextColumn::make('participant_type')
+                    ->label('Participant')
+                    ->toggleable(),
+                TextColumn::make('participant_id')
+                    ->label('User')
+                    ->toggleable(),
                 TextColumn::make('updated_at')->dateTime()->since()->sortable()->label('Last activity'),
             ])
             ->recordActions([
