@@ -54,11 +54,11 @@ Up to 0.2 this package was `solution-forest/ai-kit-filament`; from 0.3 it is
 
 ```bash
 composer remove solution-forest/ai-kit-filament solution-forest/ai-kit-ui-livewire solution-forest/ai-kit-core
-composer require freddymx/ai-kit-filament:^0.3
+composer require freddymx/ai-kit-filament:^0.4
 ```
 
-The new package pulls `freddymx/ai-kit-core:^0.3` and
-`freddymx/ai-kit-ui-livewire:^0.3` transitively. The old `solution-forest/*`
+The new package pulls `freddymx/ai-kit-core:^0.4` and
+`freddymx/ai-kit-ui-livewire:^0.4` transitively. The old `solution-forest/*`
 packages remain on Packagist at v0.2.x.
 
 ## What you get

@@ -15,8 +15,8 @@
         "php": "^8.5",
         "illuminate/support": "^12.0|^13.0",
         "filament/filament": "^5.11",
-        "freddymx/ai-kit-core": "^0.3",
-        "freddymx/ai-kit-ui-livewire": "^0.3"
+        "freddymx/ai-kit-core": "^0.4",
+        "freddymx/ai-kit-ui-livewire": "^0.4"
     },
     "require-dev": {
         "laravel/framework": "^12.0|^13.0",
