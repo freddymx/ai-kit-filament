@@ -1,8 +1,9 @@
 # Runs the test suite when a new version is released (not on every push).
 #
-# This package has local path dependencies on ai-kit-core (../ai-kit-core) and
-# ai-kit-ui-livewire (../ai-kit-ui-livewire), so CI clones both sibling repos first. Once the
-# packages are on Packagist, drop the clone steps and let Composer resolve them.
+# composer.json declares local path repositories for ai-kit-core (../ai-kit-core) and
+# ai-kit-ui-livewire (../ai-kit-ui-livewire) so cross-package changes can be tested
+# together; CI clones both siblings first. The packages themselves are published on
+# Packagist as freddymx/ai-kit-*.
 name: tests
 
 on:
@@ -27,8 +28,8 @@ jobs:
 
       - name: Clone sibling packages (path dependencies)
         run: |
-          git clone --depth=1 https://github.com/solutionforest/ai-kit-core.git ../ai-kit-core
-          git clone --depth=1 https://github.com/solutionforest/ai-kit-ui-livewire.git ../ai-kit-ui-livewire
+          git clone --depth=1 https://github.com/freddymx/ai-kit-core.git ../ai-kit-core
+          git clone --depth=1 https://github.com/freddymx/ai-kit-ui-livewire.git ../ai-kit-ui-livewire
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2

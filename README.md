@@ -23,12 +23,12 @@ call, no controllers or Blade to write.
 
 - PHP **8.5+**, Laravel **12 or 13**
 - **Filament v5** (Livewire 4)
-- `solution-forest/ai-kit-core` and `solution-forest/ai-kit-ui-livewire`
+- `freddymx/ai-kit-core` and `freddymx/ai-kit-ui-livewire`
 
 ## Install
 
 ```bash
-composer require solution-forest/ai-kit-filament
+composer require freddymx/ai-kit-filament
 ```
 
 Register the plugin on your panel:
@@ -45,6 +45,21 @@ public function panel(Panel $panel): Panel
 ```
 
 Everything appears under an **AI Kit** navigation group.
+
+## Migrating from `solution-forest/ai-kit-filament`
+
+Up to 0.2 this package was `solution-forest/ai-kit-filament`; from 0.3 it is
+`freddymx/ai-kit-filament`. The PHP namespace `SolutionForest\AiKit\` and the
+`AiKitPlugin` class are unchanged.
+
+```bash
+composer remove solution-forest/ai-kit-filament solution-forest/ai-kit-ui-livewire solution-forest/ai-kit-core
+composer require freddymx/ai-kit-filament:^0.3
+```
+
+The new package pulls `freddymx/ai-kit-core:^0.3` and
+`freddymx/ai-kit-ui-livewire:^0.3` transitively. The old `solution-forest/*`
+packages remain on Packagist at v0.2.x.
 
 ## What you get
 
@@ -111,9 +126,9 @@ Cost = logged tokens × `config('ai-kit.pricing')` ($ per 1M input / output, per
 
 | Package | Purpose |
 | --- | --- |
-| [solution-forest/ai-kit-core](https://github.com/solutionforest/ai-kit-core) | Ingestion, retrieval, agents + CLI, HTTP API, MCP |
-| [solution-forest/ai-kit-ui-livewire](https://github.com/solutionforest/ai-kit-ui-livewire) | Livewire 4 chat component |
-| **solution-forest/ai-kit-filament** (this) | Filament v5 admin panel |
+| [freddymx/ai-kit-core](https://github.com/freddymx/ai-kit-core) | Ingestion, retrieval, agents + CLI, HTTP API, MCP |
+| [freddymx/ai-kit-ui-livewire](https://github.com/freddymx/ai-kit-ui-livewire) | Livewire 4 chat component |
+| **freddymx/ai-kit-filament** (this) | Filament v5 admin panel |
 
 The panel is one of **four faces** over the same core — everything here is also
 scriptable via the CLI, callable over the HTTP API, or exposed to AI agents via
@@ -131,19 +146,22 @@ The Laravel AI SDK v1 schema replaced `user_id` with `participant_type` /
 tokens now come from `input_tokens` / `output_tokens`, with legacy
 `prompt_tokens` / `completion_tokens` rows still counted. Publish and run core's
 AI SDK backfill migration on existing databases before deploying — see the
-[core upgrade notes](https://github.com/solutionforest/ai-kit-core#upgrading-from-ai-kit-02-ai-sdk-0x--1x).
+[core upgrade notes](https://github.com/freddymx/ai-kit-core#upgrading-from-ai-kit-02-ai-sdk-0x--1x).
 
 ## Continuous integration
 
 `.github/workflows/tests.yml` runs the suite on a GitHub **release** (and manual
-dispatch) — not on every push. This package has local path dependencies on
-`ai-kit-core` and `ai-kit-ui-livewire`, so CI clones both (public) sibling repos
-first. Once the packages are on Packagist, drop the clone steps.
+dispatch) — not on every push. `composer.json` declares local **path**
+repositories at `../ai-kit-core` and `../ai-kit-ui-livewire` so cross-package
+changes can be tested together, so CI clones both siblings first. The packages
+themselves are published on Packagist as `freddymx/ai-kit-*`; the clone steps are
+only about the local path repos and can be dropped together with them.
 
 ## Author
 
-Created and maintained by **Alfredo Pineda** (<freddy@canariasnetworks.com>),
-published under the [SolutionForest](https://www.solutionforest.com) organization.
+Created and maintained by **Alfredo Pineda** (<freddy@canariasnetworks.com>).
+Originally published under the [SolutionForest](https://www.solutionforest.com)
+organization; from 0.3 on, published in the `freddymx` Packagist namespace.
 
 ## License
 
