@@ -160,4 +160,53 @@ it('resolves the supplied local server and models end to end', function (): void
         ->and($resolver->chatModel())->toBe('Gemma-4-E4B-it-GGUF')
         ->and($resolver->embeddingsModel())->toBe('Qwen3-Embedding-4B-GGUF')
         ->and($resolver->embeddingsDimensions())->toBe(768);
+
+    // Saving applies the row to config() in the same request, so direct SDK
+    // calls and code reading config('ai-kit.*') see the local server too.
+    expect(config('ai-kit.chat.provider'))->toBe('local')
+        ->and(config('ai-kit.embeddings.provider'))->toBe('local')
+        ->and(config('ai.providers.local.url'))->toBe('http://100.103.128.28/v1')
+        ->and(config('ai.providers.local.models.text.default'))->toBe('Gemma-4-E4B-it-GGUF')
+        ->and(config('ai.providers.local.models.embeddings.default'))->toBe('Qwen3-Embedding-4B-GGUF')
+        ->and(config('ai.providers.local.models.embeddings.dimensions'))->toBe(768)
+        ->and(config('ai.default'))->toBe('local')
+        ->and(config('ai.default_for_embeddings'))->toBe('local');
+});
+
+it('returns config to the .env values on reset', function (): void {
+    // At boot there is no DB row, so these are the .env-backed values.
+    $env = [
+        'chat_provider' => config('ai-kit.chat.provider'),
+        'chat_model' => config('ai-kit.chat.model'),
+        'embeddings_dimensions' => config('ai-kit.embeddings.dimensions'),
+        'local_url' => config('ai.providers.local.url'),
+        'default' => config('ai.default'),
+        'default_for_embeddings' => config('ai.default_for_embeddings'),
+    ];
+
+    Livewire::test(AiSettingsPage::class)
+        ->fillForm([
+            'chat_provider' => 'local',
+            'embeddings_provider' => 'local',
+            'local_url' => 'http://100.103.128.28/v1',
+            'local_chat_model' => 'Gemma-4-E4B-it-GGUF',
+            'local_embeddings_model' => 'Qwen3-Embedding-4B-GGUF',
+            'local_embeddings_dimensions' => '768',
+        ])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect(config('ai-kit.chat.provider'))->toBe('local')
+        ->and(config('ai.providers.local.url'))->toBe('http://100.103.128.28/v1');
+
+    Livewire::test(AiSettingsPage::class)
+        ->call('reset')
+        ->assertHasNoFormErrors();
+
+    expect(config('ai-kit.chat.provider'))->toBe($env['chat_provider'])
+        ->and(config('ai-kit.chat.model'))->toBe($env['chat_model'])
+        ->and(config('ai-kit.embeddings.dimensions'))->toBe($env['embeddings_dimensions'])
+        ->and(config('ai.providers.local.url'))->toBe($env['local_url'])
+        ->and(config('ai.default'))->toBe($env['default'])
+        ->and(config('ai.default_for_embeddings'))->toBe($env['default_for_embeddings']);
 });

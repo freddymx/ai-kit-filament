@@ -119,10 +119,13 @@ agents use.
   comes from the **database** or from **env**, plus the effective value (the key
   stays masked).
 
-**Precedence:** a non-null value in `ai_kit_settings` always wins over
-`config/ai-kit.php` (and therefore over `.env`). A blank/unset field keeps using
-the existing value. **Save** upserts the single row; **Reset to .env** (with
-confirmation) deletes it, so every setting immediately falls back to `.env`.
+**Precedence:** the database is the source of truth — a non-null value in
+`ai_kit_settings` always wins over `config/ai-kit.php` (and therefore over
+`.env`). A blank/unset field keeps using the existing value. **Save** upserts
+the single row and immediately re-applies it to `config('ai-kit.*')` and the
+SDK's `ai.providers.local` in the same request (direct `Ai::text()` /
+`Ai::embeddings()` calls see it too); **Reset to .env** (with confirmation)
+deletes the row and re-applies the `.env` values just as immediately.
 
 ## Optional features
 

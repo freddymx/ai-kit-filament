@@ -189,17 +189,23 @@ final class AiSettingsPage extends Page
     {
         $data = $this->form->getState();
 
+        $resolver = app(AiProviderResolver::class);
+
         // effective() masks the key for display (e.g. "supe********"). Writing
         // that back would replace the real secret with the mask, and an empty
         // password field means "keep the current key" per its helper text.
-        $maskedKey = app(AiProviderResolver::class)->effective()['local_key'] ?? null;
+        $maskedKey = $resolver->effective()['local_key'] ?? null;
         if (array_key_exists('local_key', $data)
             && ($data['local_key'] === '' || $data['local_key'] === null || $data['local_key'] === $maskedKey)
         ) {
             unset($data['local_key']);
         }
 
-        app(AiProviderResolver::class)->save($data);
+        $resolver->save($data);
+
+        // DB is the source of truth; re-publish it into config() so the change
+        // is visible in this very request, without a reload or a cache clear.
+        $resolver->applyToConfig();
 
         $this->fillFromResolver();
 
@@ -219,7 +225,9 @@ final class AiSettingsPage extends Page
             return;
         }
 
-        app(AiProviderResolver::class)->reset();
+        $resolver = app(AiProviderResolver::class);
+        $resolver->reset();
+        $resolver->applyToConfig();
 
         $this->fillFromResolver();
 
