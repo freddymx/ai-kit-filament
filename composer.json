@@ -3,6 +3,13 @@
     "description": "Filament admin panel for ai-kit: manage collections and documents, view conversations, and demo the chat in a Playground page.",
     "type": "library",
     "license": "MIT",
+    "authors": [
+        {
+            "name": "Alfredo Pineda",
+            "email": "freddy@canariasnetworks.com",
+            "role": "Developer"
+        }
+    ],
     "keywords": ["laravel", "filament", "ai", "rag", "admin"],
     "require": {
         "php": "^8.5",

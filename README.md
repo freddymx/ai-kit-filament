@@ -119,6 +119,20 @@ The panel is one of **four faces** over the same core — everything here is als
 scriptable via the CLI, callable over the HTTP API, or exposed to AI agents via
 MCP (all in `ai-kit-core`).
 
+## Upgrading from ai-kit 0.2
+
+This package is part of the **0.3 breaking release** of the ai-kit suite: PHP
+**8.5+**, Filament **^5.11**, Pest **5**, `ai-kit-core` and
+`ai-kit-ui-livewire` at `^0.3`, and `dev-main` aliased to `0.3.x-dev`. Upgrade
+the whole suite in lockstep.
+
+The Laravel AI SDK v1 schema replaced `user_id` with `participant_type` /
+`participant_id`; the Conversations resource was updated accordingly. Per-message
+tokens now come from `input_tokens` / `output_tokens`, with legacy
+`prompt_tokens` / `completion_tokens` rows still counted. Publish and run core's
+AI SDK backfill migration on existing databases before deploying — see the
+[core upgrade notes](https://github.com/solutionforest/ai-kit-core#upgrading-from-ai-kit-02-ai-sdk-0x--1x).
+
 ## Continuous integration
 
 `.github/workflows/tests.yml` runs the suite on a GitHub **release** (and manual
@@ -126,6 +140,11 @@ dispatch) — not on every push. This package has local path dependencies on
 `ai-kit-core` and `ai-kit-ui-livewire`, so CI clones both (public) sibling repos
 first. Once the packages are on Packagist, drop the clone steps.
 
+## Author
+
+Created and maintained by **Alfredo Pineda** (<freddy@canariasnetworks.com>),
+published under the [SolutionForest](https://www.solutionforest.com) organization.
+
 ## License
 
-MIT © [SolutionForest](https://www.solutionforest.com)
+MIT © [SolutionForest](https://www.solutionforest.com), Alfredo Pineda
