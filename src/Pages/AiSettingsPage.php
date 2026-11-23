@@ -72,59 +72,73 @@ final class AiSettingsPage extends Page
     {
         return $schema->components([
             Form::make([
-                Section::make('Chat')
-                    ->description('Provider and model used for text generation.')
+                Section::make('Providers')
+                    ->description('Choose where each part of the RAG pipeline runs. "Local" uses the shared server configured below.')
                     ->schema([
                         Select::make('chat_provider')
+                            ->label('Chat provider')
                             ->options(self::PROVIDERS)
                             ->placeholder('Use .env default')
                             ->live(),
-                        TextInput::make('chat_model')
-                            ->placeholder('e.g. gpt-4o-mini'),
+                        Select::make('embeddings_provider')
+                            ->label('Embeddings provider')
+                            ->options(self::PROVIDERS)
+                            ->placeholder('Use .env default')
+                            ->live(),
                     ])
                     ->columns(2),
 
-                Section::make('Embeddings')
-                    ->description('Provider, model and vector size used for indexing and retrieval.')
+                Section::make('Chat')
+                    ->description('Which model answers the user.')
                     ->schema([
-                        Select::make('embeddings_provider')
-                            ->options(self::PROVIDERS)
-                            ->placeholder('Use .env default')
-                            ->live(),
-                        TextInput::make('embeddings_model')
-                            ->placeholder('e.g. text-embedding-3-small'),
-                        TextInput::make('embeddings_dimensions')
-                            ->numeric(),
-                    ])
-                    ->columns(3),
+                        $this->modelField('chat_model', 'Chat model', 'e.g. gpt-4o-mini', 'chat_provider', false),
+                        $this->modelField('local_chat_model', 'Chat model (local)', 'e.g. Gemma-4-E4B-it-GGUF', 'chat_provider', true),
+                    ]),
 
-                Section::make('Local provider')
-                    ->description('Settings for the "local" sentinel (Ollama, LM Studio, llama.cpp, vLLM...).')
+                Section::make('Embeddings')
+                    ->description('Which model indexes documents and embeds queries.')
+                    ->schema([
+                        $this->modelField('embeddings_model', 'Embedding model', 'e.g. text-embedding-3-small', 'embeddings_provider', false),
+                        $this->modelField('local_embeddings_model', 'Embedding model (local)', 'e.g. Qwen3-Embedding-4B-GGUF', 'embeddings_provider', true),
+                        TextInput::make('embeddings_dimensions')
+                            ->label('Vector dimensions')
+                            ->numeric()
+                            ->visible(fn (Get $get): bool => $get('embeddings_provider') !== 'local')
+                            ->helperText('Must match the cloud embedding model.'),
+                        TextInput::make('local_embeddings_dimensions')
+                            ->label('Vector dimensions (local)')
+                            ->numeric()
+                            ->visible(fn (Get $get): bool => $get('embeddings_provider') === 'local')
+                            ->helperText('Must match the local embedding model.'),
+                    ])
+                    ->columns(2),
+
+                Section::make('Local server')
+                    ->description('One OpenAI-compatible endpoint shared by chat and embeddings — Ollama, LM Studio, vLLM, llama.cpp.')
                     ->visible(fn (Get $get): bool => $this->isLocal($get))
                     ->schema([
                         Select::make('local_driver')
+                            ->label('Driver')
                             ->options(self::LOCAL_DRIVERS)
                             ->placeholder('Use .env default')
                             ->live(),
                         TextInput::make('local_url')
+                            ->label('Base URL')
                             ->url()
                             ->required(fn (Get $get): bool => $this->isLocal($get))
-                            ->placeholder('http://localhost:11434/v1'),
+                            ->placeholder('http://localhost:11434/v1')
+                            ->helperText('Ollama OpenAI-compatible endpoint: http://host:11434/v1'),
                         TextInput::make('local_key')
+                            ->label('API key (optional)')
                             ->password()
                             ->revealable()
-                            ->helperText('Leave blank to keep the current key'),
-                        TextInput::make('local_chat_model')
-                            ->placeholder('e.g. llama3.2'),
-                        TextInput::make('local_embeddings_model')
-                            ->placeholder('e.g. nomic-embed-text'),
-                        TextInput::make('local_embeddings_dimensions')
-                            ->numeric(),
+                            ->helperText('Leave blank to keep the current key — most local servers need none.'),
                     ])
                     ->columns(2),
 
-                Section::make('Effective value origins')
-                    ->description('Values marked "database" override the matching .env value.')
+                Section::make('Effective configuration')
+                    ->description('The value in effect for each setting, and whether it comes from this page (database) or .env.')
+                    ->collapsed()
                     ->schema([
                         Html::make(fn (): HtmlString => $this->originsHtml()),
                     ]),
@@ -148,6 +162,27 @@ final class AiSettingsPage extends Page
                     ]),
                 ]),
         ])->statePath('data');
+    }
+
+    /**
+     * The cloud and local variants of a model field live in the same section;
+     * only the one matching the selected provider is rendered, so the form
+     * never shows two fields that look like the same setting.
+     */
+    private function modelField(
+        string $name,
+        string $label,
+        string $placeholder,
+        string $providerKey,
+        bool $local,
+    ): TextInput {
+        return TextInput::make($name)
+            ->label($label)
+            ->placeholder($placeholder)
+            ->visible(fn (Get $get): bool => $local
+                ? $get($providerKey) === 'local'
+                : $get($providerKey) !== 'local')
+            ->required(fn (Get $get): bool => $local && $get($providerKey) === 'local');
     }
 
     public function save(): void
@@ -206,13 +241,27 @@ final class AiSettingsPage extends Page
         $effective = app(AiProviderResolver::class)->effective();
         $sources = $effective['sources'] ?? [];
 
+        $labels = [
+            'chat_provider' => 'Chat provider',
+            'chat_model' => 'Chat model',
+            'embeddings_provider' => 'Embeddings provider',
+            'embeddings_model' => 'Embedding model',
+            'embeddings_dimensions' => 'Vector dimensions',
+            'local_driver' => 'Local driver',
+            'local_url' => 'Local base URL',
+            'local_key' => 'Local API key',
+            'local_chat_model' => 'Chat model (local)',
+            'local_embeddings_model' => 'Embedding model (local)',
+            'local_embeddings_dimensions' => 'Vector dimensions (local)',
+        ];
+
         $rows = '';
         foreach ($sources as $key => $source) {
             $value = $effective[$key] ?? null;
             $display = $value === null || $value === '' ? '—' : (string) $value;
 
             $rows .= '<tr>'
-                . '<td class="px-2 py-1 font-mono text-xs">' . e((string) $key) . '</td>'
+                . '<td class="px-2 py-1">' . e($labels[$key] ?? (string) $key) . '</td>'
                 . '<td class="px-2 py-1"><span class="fi-badge fi-size-sm ' . ($source === 'database' ? 'fi-color-primary' : 'fi-color-gray') . '">' . e((string) $source) . '</span></td>'
                 . '<td class="px-2 py-1 font-mono text-xs break-all">' . e($display) . '</td>'
                 . '</tr>';

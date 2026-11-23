@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Filament\Facades\Filament;
 use Filament\Panel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Ai\Contracts\Providers\Provider;
 use Livewire\Livewire;
 use SolutionForest\AiKit\Filament\AiKitPlugin;
 use SolutionForest\AiKit\Filament\Pages\AiSettingsPage;
@@ -42,7 +43,7 @@ it('mounts and renders the settings page with the effective values', function ()
         ->assertOk()
         ->assertSet('data.chat_provider', $effective['chat_provider'])
         ->assertSet('data.chat_model', $effective['chat_model'])
-        ->assertSee('Effective value origins')
+        ->assertSee('Effective configuration')
         ->assertSee('Reset to .env')
         ->assertSeeHtml('wire:submit="save"')
         ->assertSeeHtml('id="save"');
@@ -74,13 +75,15 @@ it('saves provider overrides in the database and the resolver sees them', functi
 
     expect($settings)->not->toBeNull()
         ->and($settings->chat_provider)->toBe('local')
-        ->and($settings->chat_model)->toBe('custom-chat')
+        ->and($settings->chat_model)->toBeNull()
+        ->and($settings->local_chat_model)->toBe('local-llm')
         ->and($settings->local_url)->toBe('http://127.0.0.1:8080/v1')
         ->and($settings->embeddings_dimensions)->toBe(768);
 
     $effective = app(AiProviderResolver::class)->effective();
 
     expect($effective['chat_provider'])->toBe('local')
+        ->and($effective['chat_model'])->toBe(config('ai-kit.chat.model'))
         ->and($effective['local_chat_model'])->toBe('local-llm')
         ->and($effective['embeddings_dimensions'])->toBe(768)
         ->and($effective['sources']['chat_provider'])->toBe('database')
@@ -122,4 +125,39 @@ it('deletes the settings row on reset so values come from .env again', function 
         ->and($effective['chat_provider'])->toBe(config('ai-kit.chat.provider'))
         ->and($effective['source'])->toBe('env')
         ->and($effective['sources']['chat_provider'])->toBe('env');
+});
+
+it('resolves the supplied local server and models end to end', function (): void {
+    Livewire::test(AiSettingsPage::class)
+        ->fillForm([
+            'chat_provider' => 'local',
+            'embeddings_provider' => 'local',
+            'local_driver' => 'openai-compatible',
+            'local_url' => 'http://100.103.128.28/v1',
+            'local_chat_model' => 'Gemma-4-E4B-it-GGUF',
+            'local_embeddings_model' => 'Qwen3-Embedding-4B-GGUF',
+            'local_embeddings_dimensions' => '768',
+        ])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $settings = AiSettings::current();
+
+    expect($settings->local_url)->toBe('http://100.103.128.28/v1')
+        ->and($settings->local_chat_model)->toBe('Gemma-4-E4B-it-GGUF')
+        ->and($settings->local_embeddings_model)->toBe('Qwen3-Embedding-4B-GGUF');
+
+    $resolver = app(AiProviderResolver::class);
+    $chat = $resolver->chatProvider();
+    $embeddings = $resolver->embeddingsProvider();
+
+    expect($chat)->toBeArray()
+        ->and($chat[0])->toBeInstanceOf(Provider::class)
+        ->and($chat[0]->name())->toBe(AiProviderResolver::LOCAL_PROVIDER_NAME)
+        ->and($chat[0]->additionalConfiguration()['url'])->toBe('http://100.103.128.28/v1')
+        ->and($embeddings)->toBeArray()
+        ->and($embeddings[0]->additionalConfiguration()['url'])->toBe('http://100.103.128.28/v1')
+        ->and($resolver->chatModel())->toBe('Gemma-4-E4B-it-GGUF')
+        ->and($resolver->embeddingsModel())->toBe('Qwen3-Embedding-4B-GGUF')
+        ->and($resolver->embeddingsDimensions())->toBe(768);
 });
