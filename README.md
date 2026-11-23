@@ -97,6 +97,33 @@ A demo page: pick a knowledge base and chat live against it — the same Livewir
 
 A dedicated **Dashboard** page (under AI Kit, not the panel's default dashboard): documents indexed, chunks, conversations this week, **tokens (30d)**, **estimated cost (30d)**, and a **prompt vs. completion tokens-per-day** chart.
 
+### AI settings
+
+Open **AI Kit → AI Settings** in your panel (route `/admin/ai-settings` in the
+default setup). The page edits the single `ai_kit_settings` row owned by the
+core's `AiProviderResolver` — the same values the ingestion, chat, retrieval and
+agents use.
+
+- **Chat** — `chat_provider` + `chat_model`. The provider list includes `local`
+  (the OpenAI-compatible sentinel) and the hosted providers supported by the AI
+  SDK.
+- **Embeddings** — `embeddings_provider`, `embeddings_model` and
+  `embeddings_dimensions` (vector size; keep it in sync with your vector column).
+- **Local provider** — shown only when either provider is `local`: `local_driver`
+  (`openai-compatible` or `ollama`), `local_url` (required in that case),
+  `local_key` (stored encrypted; the field shows a masked value and **Leave
+  blank to keep the current key**), `local_chat_model`,
+  `local_embeddings_model` and `local_embeddings_dimensions`. This is what you
+  point at Ollama, LM Studio, llama.cpp or vLLM.
+- **Effective value origins** — a live table showing, per key, whether the value
+  comes from the **database** or from **env**, plus the effective value (the key
+  stays masked).
+
+**Precedence:** a non-null value in `ai_kit_settings` always wins over
+`config/ai-kit.php` (and therefore over `.env`). A blank/unset field keeps using
+the existing value. **Save** upserts the single row; **Reset to .env** (with
+confirmation) deletes it, so every setting immediately falls back to `.env`.
+
 ## Optional features
 
 Toggle in `config/ai-kit.php` (or `.env`):
@@ -105,11 +132,15 @@ Toggle in `config/ai-kit.php` (or `.env`):
 'features' => [
     'dashboard'   => env('AI_KIT_DASHBOARD', true),    // register the Dashboard page
     'token_usage' => env('AI_KIT_TOKEN_USAGE', true),  // token columns, per-message tokens, dashboard token stats + chart + cost
+    'settings'    => env('AI_KIT_SETTINGS', true),     // register the AI Settings page
 ],
 ```
 
 - `dashboard=false` → the Dashboard page + route are not registered.
 - `token_usage=false` → all token/cost UI is hidden (conversation column, per-message tokens, dashboard token stats and chart).
+- `settings=false` → the AI Settings page + route are not registered. This flag
+  only gates the Filament page: the core resolver keeps working with `.env`
+  values (or any overrides already saved in the database).
 
 ### Cost estimates
 

@@ -6,6 +6,7 @@ namespace SolutionForest\AiKit\Filament;
 
 use Filament\Contracts\Plugin;
 use Filament\Panel;
+use SolutionForest\AiKit\Filament\Pages\AiSettingsPage;
 use SolutionForest\AiKit\Filament\Pages\AnalyticsDashboard;
 use SolutionForest\AiKit\Filament\Pages\Playground;
 use SolutionForest\AiKit\Filament\Resources\CollectionResource;
@@ -43,6 +44,7 @@ final class AiKitPlugin implements Plugin
             ->pages(array_values(array_filter([
                 config('ai-kit.features.dashboard', true) ? AnalyticsDashboard::class : null,
                 Playground::class,
+                config('ai-kit.features.settings', true) ? AiSettingsPage::class : null,
             ])));
         // Widgets are rendered on the AnalyticsDashboard page (not the panel's
         // default dashboard), so they are not registered panel-wide here.
