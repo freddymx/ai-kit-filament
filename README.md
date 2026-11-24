@@ -115,6 +115,12 @@ agents use.
   blank to keep the current key**), `local_chat_model`,
   `local_embeddings_model` and `local_embeddings_dimensions`. This is what you
   point at Ollama, LM Studio, llama.cpp or vLLM.
+  The server's model catalogue is fetched automatically when you pick `local`,
+  change the driver, or leave the `local_url` field (`/v1/models` for
+  `openai-compatible`, `/api/tags` for Ollama), turning the model fields into
+  searchable selects. If the server is unreachable or returns no models, the
+  fields become plain text inputs so you can type the id yourself; the refresh
+  button next to `local_url` reloads the catalogue.
 - **Effective value origins** — a live table showing, per key, whether the value
   comes from the **database** or from **env**, plus the effective value (the key
   stays masked).

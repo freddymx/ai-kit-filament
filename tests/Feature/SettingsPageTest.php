@@ -5,6 +5,8 @@ declare(strict_types=1);
 use Filament\Facades\Filament;
 use Filament\Panel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Http;
 use Laravel\Ai\Contracts\Providers\Provider;
 use Livewire\Livewire;
 use SolutionForest\AiKit\Filament\AiKitPlugin;
@@ -65,7 +67,7 @@ it('saves provider overrides in the database and the resolver sees them', functi
             'chat_provider' => 'local',
             'chat_model' => 'custom-chat',
             'local_url' => 'http://127.0.0.1:8080/v1',
-            'local_chat_model' => 'local-llm',
+            'local_chat_model_manual' => 'local-llm',
             'embeddings_dimensions' => '768',
         ])
         ->call('save')
@@ -134,8 +136,8 @@ it('resolves the supplied local server and models end to end', function (): void
             'embeddings_provider' => 'local',
             'local_driver' => 'openai-compatible',
             'local_url' => 'http://100.103.128.28/v1',
-            'local_chat_model' => 'Gemma-4-E4B-it-GGUF',
-            'local_embeddings_model' => 'Qwen3-Embedding-4B-GGUF',
+            'local_chat_model_manual' => 'Gemma-4-E4B-it-GGUF',
+            'local_embeddings_model_manual' => 'Qwen3-Embedding-4B-GGUF',
             'local_embeddings_dimensions' => '768',
         ])
         ->call('save')
@@ -189,8 +191,8 @@ it('returns config to the .env values on reset', function (): void {
             'chat_provider' => 'local',
             'embeddings_provider' => 'local',
             'local_url' => 'http://100.103.128.28/v1',
-            'local_chat_model' => 'Gemma-4-E4B-it-GGUF',
-            'local_embeddings_model' => 'Qwen3-Embedding-4B-GGUF',
+            'local_chat_model_manual' => 'Gemma-4-E4B-it-GGUF',
+            'local_embeddings_model_manual' => 'Qwen3-Embedding-4B-GGUF',
             'local_embeddings_dimensions' => '768',
         ])
         ->call('save')
@@ -209,4 +211,101 @@ it('returns config to the .env values on reset', function (): void {
         ->and(config('ai.providers.local.url'))->toBe($env['local_url'])
         ->and(config('ai.default'))->toBe($env['default'])
         ->and(config('ai.default_for_embeddings'))->toBe($env['default_for_embeddings']);
+});
+
+
+it('discovers the models of an OpenAI-compatible server when the URL is set', function (): void {
+    Http::fake([
+        '*' => Http::response(['data' => [['id' => 'qwen3:8b'], ['id' => 'llama3.2']]]),
+    ]);
+
+    Livewire::test(AiSettingsPage::class)
+        ->set('data.chat_provider', 'local')
+        ->set('data.local_driver', 'openai-compatible')
+        ->set('data.local_url', 'http://localhost:11434')
+        ->assertSet('localModels', ['llama3.2' => 'llama3.2', 'qwen3:8b' => 'qwen3:8b'])
+        ->assertSet('localModelsError', null)
+        ->assertFormFieldVisible('local_chat_model')
+        ->assertFormFieldHidden('local_chat_model_manual');
+
+    Http::assertSent(fn ($request): bool => $request->url() === 'http://localhost:11434/v1/models');
+});
+
+it('uses the Ollama tags endpoint for the ollama driver', function (): void {
+    Http::fake([
+        '*' => Http::response(['models' => [['name' => 'llama3.2']]]),
+    ]);
+
+    Livewire::test(AiSettingsPage::class)
+        ->set('data.chat_provider', 'local')
+        ->set('data.local_driver', 'ollama')
+        ->set('data.local_url', 'http://localhost:11434')
+        ->assertSet('localModels', ['llama3.2' => 'llama3.2'])
+        ->assertSet('localModelsError', null);
+
+    Http::assertSent(fn ($request): bool => $request->url() === 'http://localhost:11434/api/tags');
+});
+
+it('falls back to a manual model input when the models cannot be listed', function (): void {
+    Http::fake([
+        '*' => Http::response('boom', 500),
+    ]);
+
+    Livewire::test(AiSettingsPage::class)
+        ->set('data.chat_provider', 'local')
+        ->set('data.local_url', 'http://localhost:11434')
+        ->assertSet('localModels', [])
+        ->assertSet('localModelsError', 'HTTP 500')
+        ->assertFormFieldHidden('local_chat_model')
+        ->assertFormFieldVisible('local_chat_model_manual');
+});
+
+it('falls back to a manual model input when the server is unreachable', function (): void {
+    Http::fake(fn () => throw new ConnectionException('refused'));
+
+    Livewire::test(AiSettingsPage::class)
+        ->set('data.chat_provider', 'local')
+        ->set('data.local_url', 'http://localhost:11434')
+        ->assertSet('localModels', [])
+        ->assertNotSet('localModelsError', null)
+        ->assertFormFieldVisible('local_chat_model_manual');
+});
+
+it('saves the model picked from the discovered catalogue', function (): void {
+    Http::fake([
+        '*' => Http::response(['data' => [['id' => 'qwen3:8b'], ['id' => 'llama3.2']]]),
+    ]);
+
+    Livewire::test(AiSettingsPage::class)
+        ->set('data.chat_provider', 'local')
+        ->set('data.local_url', 'http://localhost:11434')
+        ->set('data.local_chat_model', 'qwen3:8b')
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect(AiSettings::current()->local_chat_model)->toBe('qwen3:8b');
+});
+
+it('saves a manually typed model id', function (): void {
+    Livewire::test(AiSettingsPage::class)
+        ->fillForm([
+            'chat_provider' => 'local',
+            'local_url' => 'http://127.0.0.1:8080/v1',
+            'local_chat_model_manual' => 'mi-modelo',
+        ])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect(AiSettings::current()->local_chat_model)->toBe('mi-modelo');
+});
+
+it('requires a model id when the provider is local', function (): void {
+    Livewire::test(AiSettingsPage::class)
+        ->fillForm([
+            'chat_provider' => 'local',
+            'local_url' => 'http://127.0.0.1:8080/v1',
+            'local_chat_model_manual' => '',
+        ])
+        ->call('save')
+        ->assertHasFormErrors(['local_chat_model_manual' => 'required']);
 });

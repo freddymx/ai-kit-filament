@@ -16,7 +16,9 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Support\HtmlString;
+use SolutionForest\AiKit\Filament\Support\LocalModelDiscovery;
 use SolutionForest\AiKit\Support\AiProviderResolver;
+use SolutionForest\AiKit\Support\AiSettings;
 
 /**
  * Edit the provider overrides used by the core AiProviderResolver.
@@ -43,6 +45,16 @@ final class AiSettingsPage extends Page
 
     /** @var array<string, mixed> | null */
     public ?array $data = [];
+
+    /**
+     * Models reported by the local server, keyed and valued by model id.
+     * Empty until discovery succeeds; the form then falls back to free text.
+     *
+     * @var array<string, string>
+     */
+    public array $localModels = [];
+
+    public ?string $localModelsError = null;
 
     /** @var array<string, string> */
     private const PROVIDERS = [
@@ -79,27 +91,29 @@ final class AiSettingsPage extends Page
                             ->label('Chat provider')
                             ->options(self::PROVIDERS)
                             ->placeholder('Use .env default')
-                            ->live(),
+                            ->live()
+                            ->afterStateUpdated(fn (?string $state) => $this->discoverOnLocalSelected($state)),
                         Select::make('embeddings_provider')
                             ->label('Embeddings provider')
                             ->options(self::PROVIDERS)
                             ->placeholder('Use .env default')
-                            ->live(),
+                            ->live()
+                            ->afterStateUpdated(fn (?string $state) => $this->discoverOnLocalSelected($state)),
                     ])
                     ->columns(2),
 
                 Section::make('Chat')
                     ->description('Which model answers the user.')
                     ->schema([
-                        $this->modelField('chat_model', 'Chat model', 'e.g. gpt-4o-mini', 'chat_provider', false),
-                        $this->modelField('local_chat_model', 'Chat model (local)', 'e.g. Gemma-4-E4B-it-GGUF', 'chat_provider', true),
+                        $this->modelField('chat_model', 'Chat model', 'e.g. gpt-4o-mini', 'chat_provider'),
+                        ...$this->localModelFields('local_chat_model', 'Chat model (local)', 'e.g. Gemma-4-E4B-it-GGUF', 'chat_provider'),
                     ]),
 
                 Section::make('Embeddings')
                     ->description('Which model indexes documents and embeds queries.')
                     ->schema([
-                        $this->modelField('embeddings_model', 'Embedding model', 'e.g. text-embedding-3-small', 'embeddings_provider', false),
-                        $this->modelField('local_embeddings_model', 'Embedding model (local)', 'e.g. Qwen3-Embedding-4B-GGUF', 'embeddings_provider', true),
+                        $this->modelField('embeddings_model', 'Embedding model', 'e.g. text-embedding-3-small', 'embeddings_provider'),
+                        ...$this->localModelFields('local_embeddings_model', 'Embedding model (local)', 'e.g. Qwen3-Embedding-4B-GGUF', 'embeddings_provider'),
                         TextInput::make('embeddings_dimensions')
                             ->label('Vector dimensions')
                             ->numeric()
@@ -121,13 +135,22 @@ final class AiSettingsPage extends Page
                             ->label('Driver')
                             ->options(self::LOCAL_DRIVERS)
                             ->placeholder('Use .env default')
-                            ->live(),
+                            ->live()
+                            ->afterStateUpdated(fn () => $this->discoverModels()),
                         TextInput::make('local_url')
                             ->label('Base URL')
                             ->url()
                             ->required(fn (Get $get): bool => $this->isLocal($get))
                             ->placeholder('http://localhost:11434/v1')
-                            ->helperText('Ollama OpenAI-compatible endpoint: http://host:11434/v1'),
+                            ->helperText('Ollama OpenAI-compatible endpoint: http://host:11434/v1. The available models are fetched when you leave this field.')
+                            ->live(onBlur: true)
+                            ->afterStateUpdated(fn () => $this->discoverModels())
+                            ->suffixAction(
+                                Action::make('refreshModels')
+                                    ->icon('heroicon-o-arrow-path')
+                                    ->tooltip('Reload models from the server')
+                                    ->action(fn () => $this->discoverModels(notify: true)),
+                            ),
                         TextInput::make('local_key')
                             ->label('API key (optional)')
                             ->password()
@@ -174,15 +197,110 @@ final class AiSettingsPage extends Page
         string $label,
         string $placeholder,
         string $providerKey,
-        bool $local,
     ): TextInput {
         return TextInput::make($name)
             ->label($label)
             ->placeholder($placeholder)
-            ->visible(fn (Get $get): bool => $local
-                ? $get($providerKey) === 'local'
-                : $get($providerKey) !== 'local')
-            ->required(fn (Get $get): bool => $local && $get($providerKey) === 'local');
+            ->visible(fn (Get $get): bool => $get($providerKey) !== 'local');
+    }
+
+    /**
+     * Local model picker. When the server listed its models a Select is shown;
+     * otherwise a plain TextInput (`{name}_manual`) lets the user type the id.
+     * Only one of the two is ever visible, and hidden fields are not
+     * dehydrated, so they never overwrite each other. save() maps the manual
+     * field back onto `{name}`.
+     *
+     * @return array{0: Select, 1: TextInput}
+     */
+    private function localModelFields(
+        string $name,
+        string $label,
+        string $placeholder,
+        string $providerKey,
+    ): array {
+        return [
+            Select::make($name)
+                ->label($label)
+                ->options(function (Get $get) use ($name): array {
+                    $current = $get($name);
+
+                    return filled($current) && ! array_key_exists($current, $this->localModels)
+                        ? [$current => $current] + $this->localModels
+                        : $this->localModels;
+                })
+                ->searchable()
+                ->placeholder('Use .env default')
+                ->dehydratedWhenHidden(false)
+                ->visible(fn (Get $get): bool => $get($providerKey) === 'local' && $this->localModels !== [])
+                ->required(fn (Get $get): bool => $get($providerKey) === 'local'),
+            TextInput::make($name . '_manual')
+                ->label($label)
+                ->placeholder($placeholder)
+                ->helperText(fn (): ?string => $this->localModelsError !== null
+                    ? "Could not list the server's models ({$this->localModelsError}). Type the model id."
+                    : null)
+                ->dehydratedWhenHidden(false)
+                ->visible(fn (Get $get): bool => $get($providerKey) === 'local'
+                    && ($this->localModels === [] || $this->localModelsError !== null))
+                ->required(fn (Get $get): bool => $get($providerKey) === 'local'),
+        ];
+    }
+
+    /**
+     * Fetch the model catalogue from the server currently typed in the form.
+     * Never throws: on failure the form shows manual model-id inputs instead.
+     */
+    public function discoverModels(bool $notify = false): void
+    {
+        $state = $this->form->getRawState();
+        $url = trim((string) ($state['local_url'] ?? ''));
+
+        if ($url === '') {
+            $this->localModels = [];
+            $this->localModelsError = null;
+
+            return;
+        }
+
+        $driver = filled($state['local_driver'] ?? null) ? (string) $state['local_driver'] : 'openai-compatible';
+
+        $result = app(LocalModelDiscovery::class)->fetch($url, $this->discoveryKey($state['local_key'] ?? null), $driver);
+
+        $this->localModels = $result['models'];
+        $this->localModelsError = $result['error'];
+
+        if ($result['error'] !== null) {
+            Notification::make()
+                ->warning()
+                ->title('Could not list the server\'s models')
+                ->body($result['error'] . '. You can type the model id manually.')
+                ->send();
+        } elseif ($notify) {
+            Notification::make()->success()->title(count($result['models']) . ' models found')->send();
+        }
+    }
+
+    private function discoverOnLocalSelected(?string $provider): void
+    {
+        if ($provider === 'local' && $this->localModels === []) {
+            $this->discoverModels();
+        }
+    }
+
+    /**
+     * The password field holds either the user's new key, nothing, or the
+     * display mask of the stored key — never send the mask as a token.
+     */
+    private function discoveryKey(mixed $typed): ?string
+    {
+        $maskedKey = app(AiProviderResolver::class)->effective()['local_key'] ?? null;
+
+        if (filled($typed) && $typed !== $maskedKey) {
+            return (string) $typed;
+        }
+
+        return AiSettings::current()?->local_key;
     }
 
     public function save(): void
@@ -199,6 +317,18 @@ final class AiSettingsPage extends Page
             && ($data['local_key'] === '' || $data['local_key'] === null || $data['local_key'] === $maskedKey)
         ) {
             unset($data['local_key']);
+        }
+
+        // Without a catalogue the model id is typed into `*_manual`; map it onto
+        // the real column before the resolver (which ignores unknown keys).
+        foreach (['local_chat_model', 'local_embeddings_model'] as $field) {
+            $manual = $data[$field . '_manual'] ?? null;
+
+            if (is_string($manual) && trim($manual) !== '') {
+                $data[$field] = trim($manual);
+            }
+
+            unset($data[$field . '_manual']);
         }
 
         $resolver->save($data);
@@ -241,7 +371,14 @@ final class AiSettingsPage extends Page
 
     private function fillFromResolver(): void
     {
-        $this->form->fill(app(AiProviderResolver::class)->effective());
+        $effective = app(AiProviderResolver::class)->effective();
+
+        // Mirror the saved ids into the manual inputs so they stay visible
+        // when no model catalogue has been loaded.
+        $effective['local_chat_model_manual'] = $effective['local_chat_model'] ?? null;
+        $effective['local_embeddings_model_manual'] = $effective['local_embeddings_model'] ?? null;
+
+        $this->form->fill($effective);
     }
 
     private function originsHtml(): HtmlString
