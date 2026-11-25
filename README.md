@@ -7,6 +7,8 @@
 
 **The Filament admin panel for the ai-kit suite** — manage knowledge bases and documents, ingest files and URLs, review conversations with token usage, demo the chat in a Playground, and watch usage on an analytics dashboard.
 
+> Guía de desarrollo (objetivos, stack, estructura, estado y relación con la suite): [DEVELOPMENT.md](DEVELOPMENT.md)
+
 <p align="center">
   <img src="art/dashboard.png" alt="AI Kit dashboard: stats + token usage chart" width="820">
 </p>
