@@ -89,7 +89,9 @@ Ruta `/admin/ai-settings` en el setup default, grupo `AI Kit`, `navigationSort =
 - **Local server** (visible si alguno de los providers es `local`): `local_driver` (`openai-compatible` | `ollama`), `local_url` (requerido, placeholder `http://localhost:11434/v1`), `local_key` (password revealable), `local_chat_model`, `local_embeddings_model`, `local_embeddings_dimensions`.
 - **Effective configuration**: tabla colapsada con el origen (`database` / `env`) y el valor vigente de cada key.
 
-**Precedencia:** la fila única de `ai_kit_settings` (DB) gana sobre `config/ai-kit.php` (`.env`); un valor `null` cae al default. `save()` hace upsert vía `AiProviderResolver::save()` y llama de inmediato a `applyToConfig()`; `Reset to .env` borra la fila y vuelve a aplicar `config()` en el **mismo request**, sin reload ni `config:clear`. `applyToConfig()` también publica `ai.providers.local` (url/key/modelos/dimensiones); los globales del SDK se publican solo si `features.apply_to_sdk` está en `true`.
+**Precedencia:** la fila de `ai_kit_settings` (DB) gana sobre `config/ai-kit.php` (`.env`); un valor `null` cae al default. `save()` hace upsert vía `AiProviderResolver::save()` y llama de inmediato a `reapply()`; `Reset to .env` borra la fila y vuelve a aplicar `config()` en el **mismo request**, sin reload ni `config:clear`. `applyToConfig()` también publica `ai.providers.local` (url/key/modelos/dimensiones); los globales del SDK se publican solo si `features.apply_to_sdk` está en `true`.
+
+**Tenancy:** con `AI_KIT_TENANCY=true` la página edita **la fila del tenant activo** (una por tenant en la misma DB). El host debe setearlo antes de abrir el panel, por ejemplo `AiKit::setTenant($tenantId)` en un middleware del panel o `AiKit::withTenant($id, ...)`; este paquete **no** se integra automáticamente con Filament Tenancy. Sin tenant activo, `mount()` muestra un `Notification::warning()` aclarando la situación y `save()`/`reset()` muestran otro warning y **no escriben** (el core lanza `RuntimeException`, la página la convierte en notificación para no dar 500). Con tenancy desactivado se mantiene la fila global de siempre.
 
 **Descubrimiento de modelos:** `LocalModelDiscovery::fetch()` usa `GET {url}/v1/models` para `openai-compatible` (lee `data[].id`, agregando `/v1` si falta) y `GET {url}/api/tags` para `ollama` (lee `models[].name`). Corre al elegir `local`, al cambiar de driver, al salir del campo `local_url` (`live(onBlur: true)`) y con el botón de refresh. Timeout de **5s**, `Accept: JSON` y Bearer token opcional. **Nunca lanza**: cualquier fallo vuelve como `['models' => [], 'error' => ...]` y el formulario cambia el Select por un `TextInput` `{name}_manual` para escribir el id a mano; el error también se muestra como `Notification::warning()`.
 
@@ -98,7 +100,7 @@ Ruta `/admin/ai-settings` en el setup default, grupo `AI Kit`, `navigationSort =
 ```bash
 cd ../ai-kit-filament
 composer install          # usa los path repos ../ai-kit-core y ../ai-kit-ui-livewire
-vendor/bin/pest           # 24 passed / 141 assertions
+vendor/bin/pest           # 26 passed / 159 assertions
 composer validate
 ```
 
@@ -133,6 +135,8 @@ public function panel(Panel $panel): Panel
 ## 9. Decisiones de diseño y gotchas
 
 - **`reset(...$properties)`:** Livewire declara ese método en cada componente, así que la firma debe permanecer compatible. Sin argumentos (nuestro action) borra los overrides; con argumentos delega en `parent::reset(...$properties)` para conservar el comportamiento de Livewire.
+- **Sin tenant = sin escritura:** `save()`/`reset()` capturan `Throwable` pero solo convierten en warning el `RuntimeException` del guard "ai-kit tenant"; cualquier otro error se relanza para no ocultar bugs. El warning incluye el mensaje del core y no toca la DB.
+- **Cambio de tenant en el host:** `AiKit::setTenant()` re-publica la config del nuevo tenant (y `withTenant()` también al restaurar en `finally`). En Octane/workers, setear el tenant por request es obligatorio: `config()` es process-global y si no se re-aplica se vería la config del tenant anterior.
 - **Filament v5, no v3/v4:** `AiSettingsPage::form(Schema $schema)` usa `Filament\Schemas\Schema` y `Filament\Schemas\Components\{Form, Actions, Section, Html}` más `Filament\Actions\Action`. Trabajar con la API de `Forms\Form` antigua rompe el page.
 - **Key cifrada y enmascarada:** el core guarda `local_key` cifrado y `effective()` lo devuelve enmascarado (`supe********`). `save()` descarta el campo si está vacío, `null` o igual al mask; `discoveryKey()` tampoco envía el mask como Bearer token. **El mask nunca se guarda.**
 - **Campos ocultos:** en Filament v5 el default es `isDehydratedWhenHidden = false`, así que un field oculto **no entra al state deshidratado** (no se graba "a null" literalmente; la columna queda `null` o conserva su valor). Es intencional: los pickers locales llevan `dehydratedWhenHidden(false)` para que el Select y el input manual no se sobreescriban; `save()` re-mapea `{name}_manual` sobre `{name}`. Los tests congelan este comportamiento (`chat_model` cloud oculto queda `null`).
@@ -144,7 +148,7 @@ public function panel(Panel $panel): Panel
 
 Checklist antes de publicar:
 
-1. `vendor/bin/pest` en este paquete (y en los hermanos si el cambio es transversal) — estado actual: `24 passed / 141 assertions`.
+1. `vendor/bin/pest` en este paquete (y en los hermanos si el cambio es transversal) — estado actual: `26 passed / 159 assertions`.
 2. `composer validate` sin errores.
 3. Revisar los cuatro flags con `false` y `true`, en especial que `settings=false` no rompa el resolver y que `token_usage=false` oculte columna + stats + chart.
 4. Verificar el flujo completo en el panel fixture: upload → reindex → chunks → Playground → save/reset de AI Settings.

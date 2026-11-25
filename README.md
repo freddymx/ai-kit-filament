@@ -104,7 +104,9 @@ A dedicated **Dashboard** page (under AI Kit, not the panel's default dashboard)
 Open **AI Kit → AI Settings** in your panel (route `/admin/ai-settings` in the
 default setup). The page edits the single `ai_kit_settings` row owned by the
 core's `AiProviderResolver` — the same values the ingestion, chat, retrieval and
-agents use.
+agents use. With `AI_KIT_TENANCY=true` the page edits the active tenant's row;
+your panel must call `AiKit::setTenant($id)` (or `withTenant()`) before rendering
+it, otherwise saving shows a warning instead of writing.
 
 - **Chat** — `chat_provider` + `chat_model`. The provider list includes `local`
   (the OpenAI-compatible sentinel) and the hosted providers supported by the AI

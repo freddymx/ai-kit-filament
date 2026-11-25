@@ -16,16 +16,21 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Support\HtmlString;
+use RuntimeException;
+use SolutionForest\AiKit\Facades\AiKit;
 use SolutionForest\AiKit\Filament\Support\LocalModelDiscovery;
 use SolutionForest\AiKit\Support\AiProviderResolver;
 use SolutionForest\AiKit\Support\AiSettings;
+use Throwable;
 
 /**
  * Edit the provider overrides used by the core AiProviderResolver.
  *
  * Every field maps 1:1 to a nullable column in `ai_kit_settings`: a non-null
  * value wins over config/ai-kit.php (.env), a null value falls back to it.
- * Resetting deletes the row, so the whole app goes back to .env defaults.
+ * With tenancy enabled the page edits the row of the active tenant; the host
+ * panel must set it via AiKit::setTenant() / AiKit::withTenant(). Resetting
+ * deletes only that tenant's row.
  */
 final class AiSettingsPage extends Page
 {
@@ -77,6 +82,14 @@ final class AiSettingsPage extends Page
 
     public function mount(): void
     {
+        if (AiKit::tenancyEnabled() && ! AiKit::hasTenant()) {
+            Notification::make()
+                ->warning()
+                ->title('Set an AI Kit tenant before editing')
+                ->body('Multi-tenancy is enabled but no tenant is active. Call AiKit::setTenant($id) in your panel before editing these settings; changes will not be saved until you do.')
+                ->send();
+        }
+
         $this->fillFromResolver();
     }
 
@@ -331,11 +344,25 @@ final class AiSettingsPage extends Page
             unset($data[$field . '_manual']);
         }
 
-        $resolver->save($data);
+        try {
+            $resolver->save($data);
 
-        // DB is the source of truth; re-publish it into config() so the change
-        // is visible in this very request, without a reload or a cache clear.
-        $resolver->applyToConfig();
+            // DB is the source of truth; re-publish it into config() so the
+            // change is visible in this very request, without a reload.
+            $resolver->reapply();
+        } catch (Throwable $e) {
+            if (! $this->isMissingTenantError($e)) {
+                throw $e;
+            }
+
+            Notification::make()
+                ->warning()
+                ->title('AI settings not saved')
+                ->body($e->getMessage())
+                ->send();
+
+            return;
+        }
 
         $this->fillFromResolver();
 
@@ -356,12 +383,36 @@ final class AiSettingsPage extends Page
         }
 
         $resolver = app(AiProviderResolver::class);
-        $resolver->reset();
-        $resolver->applyToConfig();
+
+        try {
+            $resolver->reset();
+            $resolver->reapply();
+        } catch (Throwable $e) {
+            if (! $this->isMissingTenantError($e)) {
+                throw $e;
+            }
+
+            Notification::make()
+                ->warning()
+                ->title('AI settings not reset')
+                ->body($e->getMessage())
+                ->send();
+
+            return;
+        }
 
         $this->fillFromResolver();
 
         Notification::make()->success()->title('AI settings reset to .env')->send();
+    }
+
+    /**
+     * Only the core's "no tenant" guard is a user-facing warning. Any other
+     * failure is rethrown so real bugs are not silently swallowed.
+     */
+    private function isMissingTenantError(Throwable $e): bool
+    {
+        return $e instanceof RuntimeException && str_contains($e->getMessage(), 'ai-kit tenant');
     }
 
     private function isLocal(Get $get): bool
