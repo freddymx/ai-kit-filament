@@ -32,10 +32,10 @@ El vendor Composer es `freddymx`, pero el **namespace PHP sigue siendo `Solution
 ## 4. Estado actual
 
 - **Versión publicada: `v0.4.4`** (tag exacto en `HEAD`, `git describe` → `v0.4.4`).
-- **Tests: `24 passed / 141 assertions`** (`vendor/bin/pest`, verificado en este repo).
+- **Tests: `28 passed / 172 assertions`** (`vendor/bin/pest`, verificado en este repo).
 - Capacidades implementadas:
   - **Collections** con *relation manager* de Documents: upload de `pdf`, `txt`, `md`, `html`, `.docx`, `.xlsx`, **Add from URL**, ver chunks, re-index, delete, badge de status (`pending / processing / indexed / failed`) y `chunk_count`.
-  - **Conversations read-only**: columna con tokens totales (in / out) y vista de mensajes con tokens por mensaje; `canCreate()` es `false`.
+  - **Conversations**: columna con tokens totales (in / out) y vista de mensajes con tokens por mensaje; `canCreate()` es `false`, pero se pueden borrar (acción de fila y bulk, ambas con confirmación; `canDelete()` / `canDeleteAny()` devuelven `true`). El observer del core elimina los mensajes junto con la conversación.
   - **Playground**: selector de collection + chat en vivo embebido del paquete UI.
   - **Dashboard** propio (`AI Kit → Dashboard`): documents indexed, chunks, conversaciones de la semana, tokens (30d), costo estimado (30d) y chart apilado prompt vs. completion por día.
   - **AI Settings page**: overrides de provider en DB con descubrimiento de modelos locales; feature flags.
@@ -50,7 +50,7 @@ src/Pages/                          # AiSettingsPage, AnalyticsDashboard, Playgr
 src/Resources/
   CollectionResource.php            # CRUD + DocumentsRelationManager
   DocumentResource.php              # rutas/upload; shouldRegisterNavigation() = false
-  ConversationResource.php          # solo lectura + columna de tokens
+  ConversationResource.php          # lectura + borrado (fila/bulk) + columna de tokens
   */Pages/                          # List/Create/Edit Collections, List/Create Documents,
                                     # List/View Conversations
   CollectionResource/RelationManagers/DocumentsRelationManager.php
@@ -61,7 +61,8 @@ resources/views/                    # analytics.blade.php, chunks.blade.php,
                                     # filament/pages/ai-settings-page.blade.php
 tests/
   TestCase.php, Pest.php            # Testbench + providers de Filament/core/UI/panel fixture
-  Feature/PanelTest.php             # 9 tests: registro, widgets, flags, upload, stats, playground
+  Feature/PanelTest.php             # 10 tests: registro, widgets, flags, permisos/acciones de borrado, upload, stats, playground
+  Feature/ConversationDeletionTest.php # borrado de conversación + mensajes vía observer del core
   Feature/SettingsPageTest.php      # 15 tests: page, save/reset, key, discovery, fallback
   Fixtures/AdminPanelProvider.php   # panel 'admin', path 'admin', AiKitPlugin
   Support/FakeEmbedder.php          # embedder determinístico (DIMENSIONS fijas)
@@ -100,7 +101,7 @@ Ruta `/admin/ai-settings` en el setup default, grupo `AI Kit`, `navigationSort =
 ```bash
 cd ../ai-kit-filament
 composer install          # usa los path repos ../ai-kit-core y ../ai-kit-ui-livewire
-vendor/bin/pest           # 26 passed / 159 assertions
+vendor/bin/pest           # 28 passed / 172 assertions
 composer validate
 ```
 
@@ -129,6 +130,7 @@ public function panel(Panel $panel): Panel
 | Upload → indexación | `FileUpload` en `disk('local')`, `directory('ai-kit/uploads')` → `DocumentResource::prepareUpload()` resuelve `source_path`, `mime` y `title` → `IngestionService::queue($record)` encadena `ExtractText → ChunkDocument → EmbedChunks` en la conexión `AI_KIT_QUEUE`. Estado `pending → processing → indexed` (o `failed`). Add from URL usa `createFromUrl(..., sync: false)`. |
 | Ver chunks | Action `viewChunks` renderiza `ai-kit-filament::chunks` con `$record->chunks()->orderBy('chunk_index')->get()`; muestra `embedded`/`pending`, `embedding_model` y 600 chars por chunk. |
 | Token usage | `UsageStats::conversationTokens()` en la columna de Conversations y en `ViewConversation`; `UsageStats::messageTokens($message->usage)` por mensaje en `conversation.blade.php`. En el Dashboard, `UsageStats::totals(30)` y `daily(14)`. |
+| Borrar conversación | `DeleteAction` por fila y `DeleteBulkAction` en `ConversationResource::table()`, ambos con confirmación. Filament llama `Model::delete()`; el observer `Conversation::deleting()` del core borra los mensajes. `canDelete(Model $record)` y `canDeleteAny()` devuelven `true` (admin global, sujeto al auth del panel). |
 | Descubrir y guardar modelo local | Elegir `local` → seleccionar driver / escribir URL → el page consulta el catálogo → elegir modelo del Select → **Save**: `local_chat_model` se escribe en `ai_kit_settings` y `applyToConfig()` lo refleja en `ai-kit.*` y `ai.providers.local` al instante. |
 | Resetear a `.env` | **Reset to .env** (con confirmación) → `AiSettingsPage::reset()` → `AiProviderResolver::reset()` borra la fila → `applyToConfig()` restaura los valores de entorno. |
 
@@ -138,6 +140,7 @@ public function panel(Panel $panel): Panel
 - **Sin tenant = sin escritura:** `save()`/`reset()` capturan `Throwable` pero solo convierten en warning el `RuntimeException` del guard "ai-kit tenant"; cualquier otro error se relanza para no ocultar bugs. El warning incluye el mensaje del core y no toca la DB.
 - **Cambio de tenant en el host:** `AiKit::setTenant()` re-publica la config del nuevo tenant (y `withTenant()` también al restaurar en `finally`). En Octane/workers, setear el tenant por request es obligatorio: `config()` es process-global y si no se re-aplica se vería la config del tenant anterior.
 - **Filament v5, no v3/v4:** `AiSettingsPage::form(Schema $schema)` usa `Filament\Schemas\Schema` y `Filament\Schemas\Components\{Form, Actions, Section, Html}` más `Filament\Actions\Action`. Trabajar con la API de `Forms\Form` antigua rompe el page.
+- **Borrado de conversaciones sin FK cascade:** la migración de `laravel/ai` no pone `ON DELETE CASCADE` en `agent_conversation_messages.conversation_id`. El core registra `Conversation::deleting()` (en `AiKitServiceProvider`) y borra los mensajes, así que **no hay que duplicar esa lógica en el resource**: alcanza con que Filament elimine el modelo Eloquent. `canDelete()` en Filament 5 exige el argumento `Model $record`; además `canDeleteAny()` habilita la acción bulk. Los namespaces son `Filament\Actions\DeleteAction` y `Filament\Actions\DeleteBulkAction`.
 - **Key cifrada y enmascarada:** el core guarda `local_key` cifrado y `effective()` lo devuelve enmascarado (`supe********`). `save()` descarta el campo si está vacío, `null` o igual al mask; `discoveryKey()` tampoco envía el mask como Bearer token. **El mask nunca se guarda.**
 - **Campos ocultos:** en Filament v5 el default es `isDehydratedWhenHidden = false`, así que un field oculto **no entra al state deshidratado** (no se graba "a null" literalmente; la columna queda `null` o conserva su valor). Es intencional: los pickers locales llevan `dehydratedWhenHidden(false)` para que el Select y el input manual no se sobreescriban; `save()` re-mapea `{name}_manual` sobre `{name}`. Los tests congelan este comportamiento (`chat_model` cloud oculto queda `null`).
 - **`LocalModelDiscovery` nunca lanza:** captura `Throwable`, llama a `report($e)` y devuelve un `error` amigable; por eso la UI siempre tiene un fallback manual.
@@ -148,7 +151,7 @@ public function panel(Panel $panel): Panel
 
 Checklist antes de publicar:
 
-1. `vendor/bin/pest` en este paquete (y en los hermanos si el cambio es transversal) — estado actual: `26 passed / 159 assertions`.
+1. `vendor/bin/pest` en este paquete (y en los hermanos si el cambio es transversal) — estado actual: `28 passed / 172 assertions`.
 2. `composer validate` sin errores.
 3. Revisar los cuatro flags con `false` y `true`, en especial que `settings=false` no rompa el resolver y que `token_usage=false` oculte columna + stats + chart.
 4. Verificar el flujo completo en el panel fixture: upload → reindex → chunks → Playground → save/reset de AI Settings.

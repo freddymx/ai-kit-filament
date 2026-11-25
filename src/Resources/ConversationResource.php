@@ -4,16 +4,20 @@ declare(strict_types=1);
 
 namespace SolutionForest\AiKit\Filament\Resources;
 
+use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\ViewAction;
 use Filament\Resources\Resource;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 use Laravel\Ai\Models\Conversation;
 use SolutionForest\AiKit\Filament\Resources\ConversationResource\Pages;
 use SolutionForest\AiKit\Support\UsageStats;
 
 /**
- * Read-only viewer for the AI SDK's conversation log (agent_conversations).
+ * Viewer for the AI SDK's conversation log (agent_conversations).
+ * Read-only except for deletions; the core's Eloquent observer removes messages.
  */
 final class ConversationResource extends Resource
 {
@@ -30,6 +34,16 @@ final class ConversationResource extends Resource
     public static function canCreate(): bool
     {
         return false;
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        return true;
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return true;
     }
 
     public static function table(Table $table): Table
@@ -64,6 +78,13 @@ final class ConversationResource extends Resource
             ])
             ->recordActions([
                 ViewAction::make(),
+                DeleteAction::make()
+                    ->requiresConfirmation()
+                    ->modalHeading('Delete this conversation?')
+                    ->modalDescription('This permanently deletes the conversation and all of its messages. This action cannot be undone.'),
+            ])
+            ->bulkActions([
+                DeleteBulkAction::make(),
             ])
             ->defaultSort('updated_at', 'desc');
     }

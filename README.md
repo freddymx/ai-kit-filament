@@ -79,9 +79,9 @@ A **Collections** resource. Open a collection to manage its **Documents** inline
   <img src="art/collection-documents.png" alt="Collection edit page with inline documents relation manager" width="820">
 </p>
 
-### Conversations (read-only) with token usage
+### Conversations with token usage
 
-A log viewer of every conversation. The list shows **total tokens (in / out)** per conversation; open one to see the message thread with **per-message input/output tokens**.
+A log viewer of every conversation. The list shows **total tokens (in / out)** per conversation; open one to see the message thread with **per-message input/output tokens**. Conversations can also be **deleted** — via the row action or bulk selection, both with confirmation — which removes their messages as well. Deletion respects your panel's authorization (the resource grants it globally by default).
 
 <p align="center">
   <img src="art/conversation.png" alt="Conversation detail with per-message token usage" width="820">

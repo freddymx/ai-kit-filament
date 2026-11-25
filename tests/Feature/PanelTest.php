@@ -2,13 +2,17 @@
 
 declare(strict_types=1);
 
+use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
 use Filament\Facades\Filament;
+use Filament\Tables\Table;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use SolutionForest\AiKit\Filament\Pages\AnalyticsDashboard;
 use SolutionForest\AiKit\Filament\Pages\Playground;
 use SolutionForest\AiKit\Filament\Resources\CollectionResource;
 use SolutionForest\AiKit\Filament\Resources\ConversationResource;
+use SolutionForest\AiKit\Filament\Resources\ConversationResource\Pages\ListConversations;
 use SolutionForest\AiKit\Filament\Resources\DocumentResource;
 use SolutionForest\AiKit\Filament\Widgets\AiKitStatsWidget;
 use SolutionForest\AiKit\Filament\Widgets\TokenUsageChart;
@@ -59,11 +63,31 @@ it('exposes a documents relation manager on the collection resource', function (
         ->toContain(\SolutionForest\AiKit\Filament\Resources\CollectionResource\RelationManagers\DocumentsRelationManager::class);
 });
 
-it('binds each resource to its model and makes conversations read-only', function (): void {
+it('binds each resource to its model and allows deleting but not creating conversations', function (): void {
     expect(CollectionResource::getModel())->toBe(Collection::class)
         ->and(DocumentResource::getModel())->toBe(Document::class)
         ->and(ConversationResource::getModel())->toBe(\Laravel\Ai\Models\Conversation::class)
-        ->and(ConversationResource::canCreate())->toBeFalse();
+        ->and(ConversationResource::canCreate())->toBeFalse()
+        // Filament 5 requires the record argument in canDelete().
+        ->and(ConversationResource::canDelete(new \Laravel\Ai\Models\Conversation()))->toBeTrue()
+        ->and(ConversationResource::canDeleteAny())->toBeTrue();
+});
+
+it('exposes confirmed delete actions on the conversations table', function (): void {
+    $table = ConversationResource::table(Table::make(new ListConversations()));
+
+    $recordActions = $table->getRecordActions();
+    $bulkActions = $table->getBulkActions();
+
+    $delete = collect($recordActions)->first(fn ($action): bool => $action instanceof DeleteAction);
+    $deleteBulk = collect($bulkActions)->first(fn ($action): bool => $action instanceof DeleteBulkAction);
+
+    expect($recordActions)->toHaveCount(2)
+        ->and($delete)->toBeInstanceOf(DeleteAction::class)
+        ->and($delete->isConfirmationRequired())->toBeTrue()
+        ->and($delete->getModalHeading())->toBe('Delete this conversation?')
+        ->and($deleteBulk)->toBeInstanceOf(DeleteBulkAction::class)
+        ->and($deleteBulk->isConfirmationRequired())->toBeTrue();
 });
 
 it('maps an uploaded file into ingestible document attributes', function (): void {
