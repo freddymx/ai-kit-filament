@@ -89,10 +89,10 @@ A log viewer of every conversation. The list shows **total tokens (in / out)** p
 
 ### Playground
 
-A demo page: pick a knowledge base and chat live against it — the same Livewire component your app embeds. Ideal for client demos.
+A demo page: chat live against a knowledge base using the same Livewire component your app embeds. The knowledge-base selector is **part of that component** (`ck-*`, matching the chat's styling), not a separate control in the page — enable it with `:collection-selector="true"`. Switching bases resets the conversation. Ideal for client demos.
 
 <p align="center">
-  <img src="art/playground.png" alt="Playground page with collection selector and chat" width="820">
+  <img src="art/playground.png" alt="Playground page with the Livewire chat's knowledge-base selector and chat" width="820">
 </p>
 
 ### Analytics dashboard

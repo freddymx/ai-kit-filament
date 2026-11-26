@@ -8,6 +8,7 @@ use Filament\Facades\Filament;
 use Filament\Tables\Table;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Livewire;
 use SolutionForest\AiKit\Filament\Pages\AnalyticsDashboard;
 use SolutionForest\AiKit\Filament\Pages\Playground;
 use SolutionForest\AiKit\Filament\Resources\CollectionResource;
@@ -141,6 +142,31 @@ it('preselects the first collection when the playground mounts', function (): vo
     // Ordered by name → "Alpha" first.
     expect($page->collection)->toBe('alpha')
         ->and($page->collectionOptions()->keys()->all())->toContain('alpha', 'beta');
+});
+
+it('delegates the knowledge base selector to the Livewire chat component', function (): void {
+    Collection::create(['name' => 'KB', 'slug' => 'kb']);
+
+    $view = file_get_contents(__DIR__ . '/../../resources/views/playground.blade.php');
+
+    // The Blade view must not own a <select> nor ask the page for options.
+    expect($view)
+        ->not->toContain('id="ck-collection"')
+        ->not->toContain('fi-select-input')
+        ->not->toContain('collectionOptions()')
+        ->toContain('<livewire:ai-kit.chat')
+        ->toContain(':collection="$collection"')
+        ->toContain(':collection-selector="true"')
+        ->toContain(':history="true"');
+
+    // The rendered page shows the chat component's ck-* selector instead: the
+    // new component also uses ck-collection-* classes, so assert against the
+    // old markup's id/class rather than the bare "ck-collection" substring.
+    Livewire::test(Playground::class)
+        ->assertDontSee('fi-select-input', false)
+        ->assertDontSee('id="ck-collection"', false)
+        ->assertSee('ck-collection-select', false)
+        ->assertSee('wire:key="pg-kb"', false);
 });
 
 it('computes dashboard stats from indexed documents and chunks', function (): void {

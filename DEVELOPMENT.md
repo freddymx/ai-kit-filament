@@ -16,7 +16,7 @@ Concretamente, resuelve el "no-code" del pipeline RAG: crear una collection, sub
 | `freddymx/ai-kit-ui-livewire` | Componente `<livewire:ai-kit.chat>` (Livewire 4) con streaming y citas | requerido `^0.4` |
 | **`freddymx/ai-kit-filament`** (este) | Panel de administración Filament v5 | — |
 
-Es **una de las cuatro caras sobre el mismo service layer**: la misma lógica es scriptable por CLI, invocable por HTTP API y expuesta a agentes vía MCP (todo en `ai-kit-core`), además de este panel. El Playground **embebe el componente Livewire del paquete UI** (`<livewire:ai-kit.chat :collection="..." :history="true">`), no reimplementa el chat.
+Es **una de las cuatro caras sobre el mismo service layer**: la misma lógica es scriptable por CLI, invocable por HTTP API y expuesta a agentes vía MCP (todo en `ai-kit-core`), además de este panel. El Playground **embebe el componente Livewire del paquete UI** (`<livewire:ai-kit.chat :collection="..." :collection-selector="true" :history="true">`), no reimplementa el chat ni su selector de base.
 
 El vendor Composer es `freddymx`, pero el **namespace PHP sigue siendo `SolutionForest\AiKit\Filament\`** (PSR-4 `src/`). `dev-main` tiene branch alias `0.4.x-dev`.
 
@@ -36,7 +36,7 @@ El vendor Composer es `freddymx`, pero el **namespace PHP sigue siendo `Solution
 - Capacidades implementadas:
   - **Collections** con *relation manager* de Documents: upload de `pdf`, `txt`, `md`, `html`, `.docx`, `.xlsx`, **Add from URL**, ver chunks, re-index, delete, badge de status (`pending / processing / indexed / failed`) y `chunk_count`.
   - **Conversations**: columna con tokens totales (in / out) y vista de mensajes con tokens por mensaje; `canCreate()` es `false`, pero se pueden borrar (acción de fila y bulk, ambas con confirmación; `canDelete()` / `canDeleteAny()` devuelven `true`). El observer del core elimina los mensajes junto con la conversación.
-  - **Playground**: selector de collection + chat en vivo embebido del paquete UI.
+  - **Playground**: chat en vivo embebido del paquete UI con selector de collection incluido (`:collection-selector="true"`); la página no tiene `<select>` propio.
   - **Dashboard** propio (`AI Kit → Dashboard`): documents indexed, chunks, conversaciones de la semana, tokens (30d), costo estimado (30d) y chart apilado prompt vs. completion por día.
   - **AI Settings page**: overrides de provider en DB con descubrimiento de modelos locales; feature flags.
 - `composer validate` pasa sin errores.
@@ -61,12 +61,14 @@ resources/views/                    # analytics.blade.php, chunks.blade.php,
                                     # filament/pages/ai-settings-page.blade.php
 tests/
   TestCase.php, Pest.php            # Testbench + providers de Filament/core/UI/panel fixture
-  Feature/PanelTest.php             # 10 tests: registro, widgets, flags, permisos/acciones de borrado, upload, stats, playground
+  Feature/PanelTest.php             # 11 tests: registro, widgets, flags, permisos/acciones de borrado, upload, stats, playground (mount + selector delegado)
   Feature/ConversationDeletionTest.php # borrado de conversación + mensajes vía observer del core
   Feature/SettingsPageTest.php      # 15 tests: page, save/reset, key, discovery, fallback
   Fixtures/AdminPanelProvider.php   # panel 'admin', path 'admin', AiKitPlugin
   Support/FakeEmbedder.php          # embedder determinístico (DIMENSIONS fijas)
 ```
+
+Nota del Playground: `resources/views/playground.blade.php` solo monta `<livewire:ai-kit.chat :collection="$collection" :collection-selector="true" :history="true" wire:key="pg-{{ $collection }}" />`. No queda ningún `<select>` con `fi-*` ni `id="ck-collection"` en la vista: el selector `ck-*` lo renderiza el componente del paquete UI y resetea el chat al cambiar de base. `Playground::collectionOptions()` solo se usa en `mount()` para preseleccionar la primera collection.
 
 Notas de registro: los widgets **no** se registran panel-wide (`getWidgets()` del panel no los contiene); se renderizan como `getHeaderWidgets()` de `AnalyticsDashboard`. `DocumentResource` se registra para rutas y lógica de upload pero está oculto en la navegación; los documentos se gestionan inline desde cada Collection. `AiKitPlugin::register()` condiciona `AnalyticsDashboard` con `features.dashboard` y `AiSettingsPage` con `features.settings`; `Playground` siempre se registra.
 
@@ -144,14 +146,14 @@ public function panel(Panel $panel): Panel
 - **Key cifrada y enmascarada:** el core guarda `local_key` cifrado y `effective()` lo devuelve enmascarado (`supe********`). `save()` descarta el campo si está vacío, `null` o igual al mask; `discoveryKey()` tampoco envía el mask como Bearer token. **El mask nunca se guarda.**
 - **Campos ocultos:** en Filament v5 el default es `isDehydratedWhenHidden = false`, así que un field oculto **no entra al state deshidratado** (no se graba "a null" literalmente; la columna queda `null` o conserva su valor). Es intencional: los pickers locales llevan `dehydratedWhenHidden(false)` para que el Select y el input manual no se sobreescriban; `save()` re-mapea `{name}_manual` sobre `{name}`. Los tests congelan este comportamiento (`chat_model` cloud oculto queda `null`).
 - **`LocalModelDiscovery` nunca lanza:** captura `Throwable`, llama a `report($e)` y devuelve un `error` amigable; por eso la UI siempre tiene un fallback manual.
-- **CSS del host:** el Playground embebe el componente del paquete UI; las reglas del host sobre `p`/`li` pueden ganar por especificidad al `text-align` heredado. El paquete UI lo mitiga con prefijo `ck-` y `text-align:left!important` en los hijos markdown; si el panel se ve corrido, revisar ese componente, no esta Blade.
+- **CSS del host:** el Playground embebe el componente del paquete UI (incluido su selector de base `ck-collection-*`); las reglas del host sobre `p`/`li` pueden ganar por especificidad al `text-align` heredado. El paquete UI lo mitiga con prefijo `ck-` y `text-align:left!important` en los hijos markdown; si el panel se ve corrido o el selector se ve distinto, revisar ese componente, no esta Blade.
 - **`features.settings = false`** oculta la página y su ruta, pero **no desactiva los overrides**: el resolver del core sigue leyendo `ai_kit_settings` (y `applyToConfig()` sigue publicando en `config()`).
 
 ## 10. Verificación y publicación
 
 Checklist antes de publicar:
 
-1. `vendor/bin/pest` en este paquete (y en los hermanos si el cambio es transversal) — estado actual: `28 passed / 172 assertions`.
+1. `vendor/bin/pest` en este paquete (y en los hermanos si el cambio es transversal) — estado actual: `29 passed / 183 assertions`.
 2. `composer validate` sin errores.
 3. Revisar los cuatro flags con `false` y `true`, en especial que `settings=false` no rompa el resolver y que `token_usage=false` oculte columna + stats + chart.
 4. Verificar el flujo completo en el panel fixture: upload → reindex → chunks → Playground → save/reset de AI Settings.

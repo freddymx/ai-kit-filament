@@ -8,8 +8,9 @@ use Filament\Pages\Page;
 use SolutionForest\AiKit\Models\Collection;
 
 /**
- * Client-demo page: pick a knowledge base and chat against it live. Backed by
- * the same Livewire chat component consumers embed in their own apps.
+ * Client-demo page: chat against a knowledge base live. The base selector is
+ * rendered by the embedded Livewire chat component (collection-selector), the
+ * same one consumers embed in their own apps.
  */
 final class Playground extends Page
 {
@@ -31,6 +32,9 @@ final class Playground extends Page
     }
 
     /**
+     * Only used by mount() to preselect the first collection: the selector is
+     * rendered by the Livewire chat component, not by this page's view.
+     *
      * @return \Illuminate\Support\Collection<string, string>
      */
     public function collectionOptions(): \Illuminate\Support\Collection
